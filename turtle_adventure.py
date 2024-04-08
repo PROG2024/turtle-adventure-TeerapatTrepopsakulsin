@@ -6,7 +6,11 @@ from turtle import RawTurtle
 from gamelib import Game, GameElement
 import time
 import random
-from math import cos, sqrt, sin, atan2
+from math import cos, sqrt, sin, atan2, exp, log, fabs
+
+
+def exclude(list_all, list_exclude_item):
+    return [item for item in list_all if item not in list_exclude_item]
 
 
 class TurtleGameElement(GameElement):
@@ -292,18 +296,23 @@ class StalkEnemy(Enemy):
                  game: "TurtleAdventureGame",
                  size: int,
                  color: str,
-                 speed=1):
+                 level=1):
         super().__init__(game, size, color)
         self.__id = None
-        self.speed = speed
+        self.level = level
+        self.speed = level
 
     def create(self) -> None:
+        self.x = random.choice(exclude(list(range(0, self.game.canvas.winfo_width())),
+                                       list(range(int(self.game.player.x - 20), int(self.game.player.x + 20)))))
+        self.y = random.choice(exclude(list(range(0, self.game.canvas.winfo_depth())),
+                                       list(range(int(self.game.player.y - 20), int(self.game.player.y + 20)))))
         self.__id = self.canvas.create_oval(0, 0, 0, 0, fill=self.color)
 
     def update(self) -> None:
         angle = atan2((self.game.player.y - self.y), (self.game.player.x - self.x))
-        self.x += cos(angle) * 2 * self.speed
-        self.y += sin(angle) * self.speed
+        self.x += cos(angle) * (1 - exp(-self.speed))
+        self.y += sin(angle) * 0.7 * (1 - exp(-self.speed))
         if self.hits_player():
             self.game.game_over_lose()
 
@@ -315,7 +324,7 @@ class StalkEnemy(Enemy):
                            self.y + self.size / 2)
 
     def delete(self) -> None:
-        self.game.after(30000, self.canvas.delete(self.__id))
+        self.game.after(10000*int(log(self.level + 1)), self.canvas.delete(self.__id))
 
 
 class FencingEnemy(Enemy):
@@ -327,12 +336,21 @@ class FencingEnemy(Enemy):
                  game: "TurtleAdventureGame",
                  size: int,
                  color: str,
-                 speed=1):
+                 level=1):
         super().__init__(game, size, color)
-        self.fence = random.choice([i for i in range(5, 50)])
         self.__id = None
-        self.speed = speed
-        self.movement = self.up
+        self.level = level
+        self.speed = log(self.level + 1, 20) + 0.7
+        self.fence = random.choice(list(range(20, 50)))
+        self.__movement = self.up
+
+    @property
+    def movement(self):
+        return self.__movement
+
+    @movement.setter
+    def movement(self, value):
+        self.__movement = value
 
     def create(self) -> None:
         self.__id = self.canvas.create_oval(0, 0, 0, 0, fill=self.color)
@@ -375,25 +393,37 @@ class FencingEnemy(Enemy):
         self.game.after(30000, self.canvas.delete(self.__id))
 
 
-class StraightEnemy(Enemy):
+class RandomWalkEnemy(Enemy):
     def __init__(self,
                  game: "TurtleAdventureGame",
                  size: int,
                  color: str,
-                 direction: float,
-                 speed=1):
+                 level=1):
         super().__init__(game, size, color)
         self.__id = None
-        self.speed = speed
-        self.direction = self.nw
+        self.speed = log(level, 5) + 3.7
+        self.direction = random.choice(list(range(360)))
+
+        if 90 < self.direction < 270:
+            self.x_movement = self.left
+        else:
+            self.x_movement = self.right
+
+        if 0 < self.direction < 180:
+            self.y_movement = self.up
+        else:
+            self.y_movement = self.down
 
     def create(self) -> None:
-        self.__id.append(self.canvas.create_oval(0, 0, 0, 0, fill=self.color))
+        self.__id = self.canvas.create_oval(0, 0, 0, 0, fill=self.color)
+        self.x = random.choice(exclude(list(range(0, self.game.canvas.winfo_width())),
+                                       list(range(int(self.game.player.x - 20), int(self.game.player.x + 20)))))
+        self.y = random.choice(exclude(list(range(0, self.game.canvas.winfo_depth())),
+                                       list(range(int(self.game.player.y - 20), int(self.game.player.y + 20)))))
 
     def update(self) -> None:
-        self.x += cos(self.direction)
-        self.y += sin(self.direction)
-        # self.direction()
+        self.x_movement()
+        self.y_movement()
         if self.hits_player():
             self.game.game_over_lose()
 
@@ -404,33 +434,61 @@ class StraightEnemy(Enemy):
                            self.x + self.size / 2,
                            self.y + self.size / 2)
 
-    def ne(self):
-        self.x += self.speed/sqrt(2)
-        self.y += self.speed/sqrt(2)
+    def up(self):
+        self.y -= fabs(sin(self.direction)) * self.speed
+        if self.y <= 0:
+            self.y_movement = self.down
 
-    def n(self):
-        self.y += self.speed
+    def down(self):
+        self.y += fabs(sin(self.direction)) * self.speed
+        if self.y > self.game.canvas.winfo_depth():
+            self.y_movement = self.up
 
-    def nw(self):
-        self.x -= self.speed/sqrt(2)
-        self.y += self.speed/sqrt(2)
+    def left(self):
+        self.x -= fabs(cos(self.direction)) * self.speed
+        if self.x <= 0:
+            self.x_movement = self.right
 
-    def w(self):
-        self.x -= self.speed
+    def right(self):
+        self.x += fabs(cos(self.direction)) * self.speed
+        if self.x > self.game.canvas.winfo_width():
+            self.x_movement = self.left
 
-    def sw(self):
-        self.x -= self.speed/sqrt(2)
-        self.y -= self.speed/sqrt(2)
+    def delete(self) -> None:
+        self.game.after(30000, self.canvas.delete(self.__id))
 
-    def s(self):
-        self.y -= self.speed
 
-    def se(self):
-        self.x += self.speed/sqrt(2)
-        self.y -= self.speed/sqrt(2)
+class StraightEnemy(Enemy):
+    def __init__(self,
+                 game: "TurtleAdventureGame",
+                 size: int,
+                 color: str,
+                 direction=0,
+                 speed=1):
+        super().__init__(game, size, color)
+        self.__id = None
+        self.speed = speed
+        self.__direction = direction
 
-    def e(self):
-        self.x += self.speed
+    @property
+    def direction(self):
+        return self.__direction
+
+    def create(self) -> None:
+        self.__id = self.canvas.create_oval(0, 0, 0, 0, fill=self.color)
+
+    def update(self) -> None:
+        self.x += cos(self.direction)
+        self.y += sin(self.direction)
+        if self.hits_player():
+            self.game.game_over_lose()
+
+    def render(self) -> None:
+        self.canvas.coords(self.__id,
+                           self.x - self.size / 2,
+                           self.y - self.size / 2,
+                           self.x + self.size / 2,
+                           self.y + self.size / 2)
 
     def delete(self) -> None:
         if (self.x > self.canvas.winfo_width() or
@@ -439,6 +497,15 @@ class StraightEnemy(Enemy):
                 self.y < 0):
             self.canvas.delete(self.__id)
 
+
+# class CrossFormation(StraightEnemy):
+#     def __init__(self, game: "TurtleAdventureGame", size: int, color: str):
+#         super().__init__(game, size, color)
+#         self.id = []
+#         for i in range(1, 9):
+#             self.id.append(StraightEnemy.__id)
+
+
 # TODO
 # Complete the EnemyGenerator class by inserting code to generate enemies
 # based on the given game level; call TurtleAdventureGame's add_enemy() method
@@ -446,6 +513,7 @@ class StraightEnemy(Enemy):
 #
 # Hint: the 'game' parameter is a tkinter's frame, so it's after()
 # method can be used to schedule some future events.
+
 
 class EnemyGenerator:
     """
@@ -474,23 +542,24 @@ class EnemyGenerator:
         """
         return self.__level
 
+    @level.setter
+    def level(self, value):
+        self.__level = value
+
     def create_enemy(self) -> None:
         """
         Create a new enemy, possibly based on the game level
         """
-        new_enemy = DemoEnemy(self.__game, 20, "red")
-        new_enemy.x = 100
-        new_enemy.y = 100
-        self.game.add_element(new_enemy)
-
-        stalk_enemy = StalkEnemy(self.__game, 15, "blue")
-        stalk_enemy.x = random.choice([i for i in range(int(self.game.canvas.winfo_width()))])
-        stalk_enemy.y = random.choice([i for i in range(int(self.game.canvas.winfo_depth()))])
+        stalk_enemy = StalkEnemy(self.__game, 7, "magenta", level=self.level)
         self.game.add_element(stalk_enemy)
 
-        fencing_enemy = FencingEnemy(self.__game, 15, "magenta")
+        fencing_enemy = FencingEnemy(self.__game, 10, "red", level=self.level)
         self.game.add_element(fencing_enemy)
 
+        random_walk_enemy = RandomWalkEnemy(self.__game, 14, "blue", level=self.level)
+        self.game.add_element(random_walk_enemy)
+
+        self.level += 1
         self.game.after(10000, lambda: self.create_enemy())
 
 
