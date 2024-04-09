@@ -334,7 +334,7 @@ class StalkEnemy(Enemy):
                            self.y + self.size / 2)
 
     def delete(self) -> None:
-        if time.time() - self.start_time >= 10000*int(log(self.level + 1)):
+        if time.time() - self.start_time >= 5000*int(log(self.level + 1)):
             self.x, self.y = -999, -999
             self.canvas.delete(self.__id)
 
@@ -608,7 +608,7 @@ class EnemyGenerator:
         """
         Create a new enemy, possibly based on the game level
         """
-        if self.level % 5 == 0:
+        if self.level % 2 == 0:
             stalk_enemy = StalkEnemy(self.__game, 7, "magenta", level=self.level)
             self.game.add_element(stalk_enemy)
 
