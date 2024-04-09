@@ -403,7 +403,7 @@ class FencingEnemy(Enemy):
                            self.y + self.size / 2)
 
     def delete(self) -> None:
-        if time.time() - self.start_time >= 10:
+        if time.time() - self.start_time >= 30:
             self.x, self.y = -999, -999
             self.canvas.delete(self.__id)
 
@@ -475,10 +475,10 @@ class StraightEnemy(Enemy):
                  size: int,
                  color: str,
                  direction=0,
-                 speed=1):
+                 level=1):
         super().__init__(game, size, color)
         self.__id = None
-        self.speed = speed
+        self.speed = 7 * log(level, 49)
         self.__direction = direction
 
     @property
@@ -487,10 +487,14 @@ class StraightEnemy(Enemy):
 
     def create(self) -> None:
         self.__id = self.canvas.create_oval(0, 0, 0, 0, fill=self.color)
+        self.x = random.choice(exclude(list(range(0, self.game.canvas.winfo_width())),
+                                       list(range(int(self.game.player.x - 20), int(self.game.player.x + 20)))))
+        self.y = random.choice(exclude(list(range(0, self.game.canvas.winfo_height())),
+                                       list(range(int(self.game.player.y - 20), int(self.game.player.y + 20)))))
 
     def update(self) -> None:
-        self.x += cos(self.direction)
-        self.y += sin(self.direction)
+        self.x += cos(self.direction) * self.speed
+        self.y += sin(self.direction) * self.speed
         if self.hits_player():
             self.game.game_over_lose()
         self.delete()
@@ -520,7 +524,7 @@ class LaserEnemy(Enemy):
         super().__init__(game, size, color)
         self.__id = None
         self.level = level
-        self.speed = self.level
+        self.speed = 10*(1/(1.01**self.level))/11
         self.__direction = None
         self.state = self.inactive
         self.delay = delay
@@ -544,7 +548,7 @@ class LaserEnemy(Enemy):
         self.direction = atan2(y1-y0, x1-x0)
 
     def inactive(self):
-        if time.time() - self.start_time >= 10*(1/(1.01**self.level))/11 + self.delay: # 7*exp(-self.speed)
+        if time.time() - self.start_time >= self.speed + self.delay:
             self.state = self.active
 
     def active(self):
@@ -564,26 +568,9 @@ class LaserEnemy(Enemy):
         pass
 
     def delete(self) -> None:
-        if time.time() - self.start_time >= 20*(1/(1.01**self.level))/11 + self.delay:
+        if time.time() - self.start_time >= 2 * self.speed + self.delay:
             self.direction = -999
             self.canvas.delete(self.__id)
-
-
-# class CrossFormation(StraightEnemy):
-#     def __init__(self, game: "TurtleAdventureGame", size: int, color: str):
-#         super().__init__(game, size, color)
-#         self.id = []
-#         for i in range(1, 9):
-#             self.id.append(StraightEnemy.__id)
-
-
-# TODO
-# Complete the EnemyGenerator class by inserting code to generate enemies
-# based on the given game level; call TurtleAdventureGame's add_enemy() method
-# to add enemies to the game at certain points in time.
-#
-# Hint: the 'game' parameter is a tkinter's frame, so it's after()
-# method can be used to schedule some future events.
 
 
 class EnemyGenerator:
@@ -602,7 +589,7 @@ class EnemyGenerator:
     @property
     def game(self) -> "TurtleAdventureGame":
         """
-        Get reference to the associated TurtleAnvengerGame instance
+        Get reference to the associated TurtleAdvengerGame instance
         """
         return self.__game
 
@@ -621,23 +608,35 @@ class EnemyGenerator:
         """
         Create a new enemy, possibly based on the game level
         """
-        stalk_enemy = StalkEnemy(self.__game, 7, "magenta", level=self.level)
-        self.game.add_element(stalk_enemy)
+        if self.level % 5 == 0:
+            stalk_enemy = StalkEnemy(self.__game, 7, "magenta", level=self.level)
+            self.game.add_element(stalk_enemy)
 
-        fencing_enemy = FencingEnemy(self.__game, 10, "red", level=self.level)
-        self.game.add_element(fencing_enemy)
+        if self.level % 7 == 0:
+            fencing_enemy = FencingEnemy(self.__game, 10, "red", level=self.level)
+            self.game.add_element(fencing_enemy)
 
         random_walk_enemy = RandomWalkEnemy(self.__game, 14, "blue", level=self.level)
         self.game.add_element(random_walk_enemy)
 
-        laser_num = int(log(self.level, 15) * self.level) // 5
+        if self.level % 3 == 0:
+            random_angle = random.choice(list(range(360)))
+            straight_enemy = StraightEnemy(self.__game, 37, "yellow", level=self.level, direction=random_angle)
+            self.game.add_element(straight_enemy)
+
+        k = 5
+        if self.level % 10 == 0:
+            k = 3
+        laser_num = int(log(self.level, 15) * self.level) // k
         for i in range(laser_num):
             laser_enemy = LaserEnemy(self.__game, 14, "black", level=self.level, delay=0.02*i)
             self.game.add_element(laser_enemy)
 
+        round_duration = laser_num*20 + int(1000 * 2 * laser_enemy.speed)
+        self.game.canvas.itemconfigure(self.game.level_text, text=f"Level : {self.level}")
         self.level += 1
         if self.game.is_started:
-            self.game.after(laser_num*20 + int(1000 * 20*(1/(1.02**self.level))/10), lambda: self.create_enemy())
+            self.game.after(round_duration, lambda: self.create_enemy())
 
 
 class TurtleAdventureGame(Game): # pylint: disable=too-many-ancestors
@@ -675,6 +674,13 @@ class TurtleAdventureGame(Game): # pylint: disable=too-many-ancestors
 
         self.player.x = 50
         self.player.y = self.screen_height//2
+
+        font = ("Arial", 7, "bold")
+        self.level_text = self.canvas.create_text(20,
+                                5,
+                                text=f"Level : {self.level}",
+                                font=font,
+                                fill="red")
 
     def add_enemy(self, enemy: Enemy) -> None:
         """
