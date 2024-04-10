@@ -2,12 +2,12 @@
 The turtle_adventure module maintains all classes related to the Turtle's
 adventure game.
 """
+import time
+import random
+from math import cos, sin, atan2, exp, log, fabs
 from turtle import RawTurtle
 from gamelib import Game, GameElement
-import time
-import datetime
-import random
-from math import cos, sqrt, sin, atan2, exp, log, fabs
+
 
 
 def exclude(list_all, list_exclude_item):
@@ -258,12 +258,6 @@ class Enemy(TurtleGameElement):
         )
 
 
-# TODO
-# * Define your enemy classes
-# * Implement all methods required by the GameElement abstract class
-# * Define enemy's update logic in the update() method
-# * Check whether the player hits this enemy, then call the
-#   self.game.game_over_lose() method in the TurtleAdventureGame class.
 class DemoEnemy(Enemy):
     """
     Demo enemy
@@ -334,7 +328,7 @@ class StalkEnemy(Enemy):
                            self.y + self.size / 2)
 
     def delete(self) -> None:
-        if time.time() - self.start_time >= 5000*int(log(self.level + 1)):
+        if time.time() - self.start_time >= 3000*int(log(self.level + 1)):
             self.x, self.y = -999, -999
             self.canvas.delete(self.__id)
 
@@ -409,6 +403,9 @@ class FencingEnemy(Enemy):
 
 
 class RandomWalkEnemy(Enemy):
+    """
+    Random walk Enemy
+    """
     def __init__(self,
                  game: "TurtleAdventureGame",
                  size: int,
@@ -470,6 +467,9 @@ class RandomWalkEnemy(Enemy):
 
 
 class StraightEnemy(Enemy):
+    """
+    Straight Enemy
+    """
     def __init__(self,
                  game: "TurtleAdventureGame",
                  size: int,
@@ -515,6 +515,9 @@ class StraightEnemy(Enemy):
 
 
 class LaserEnemy(Enemy):
+    """
+    Laser Enemy
+    """
     def __init__(self,
                  game: "TurtleAdventureGame",
                  size: int,
@@ -632,8 +635,9 @@ class EnemyGenerator:
             laser_enemy = LaserEnemy(self.__game, 14, "black", level=self.level, delay=0.02*i)
             self.game.add_element(laser_enemy)
 
-        round_duration = laser_num*20 + int(1000 * 2 * laser_enemy.speed)
-        self.game.canvas.itemconfigure(self.game.level_text, text=f"Level : {self.level}")
+        spd = 10*(1/(1.01**self.level))/11
+        round_duration = laser_num*20 + int(1000 * 2 * spd)
+        self.game.canvas.itemconfigure(self.game.level_text, text=f"Level: {self.level}")
         self.level += 1
         if self.game.is_started:
             self.game.after(round_duration, lambda: self.create_enemy())
